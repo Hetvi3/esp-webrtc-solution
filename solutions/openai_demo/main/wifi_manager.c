@@ -1,16 +1,3 @@
-/*
- * wifi_manager.c  (patched)
- *
- * Simplified WiFi Manager in pure C
- * - Try to connect to saved WiFi credentials in NVS
- * - If absent / fail after retries -> start SoftAP with captive portal
- * - Provide simple web page to accept SSID/password, save to NVS and reboot
- *
- * NOTES:
- * - Ensure nvs_flash_init() and esp_event_loop_create_default() are called
- *   from app_main() before calling wifi_manager_start()/wifi_init().
- */
-
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -36,7 +23,7 @@
 #include <lwip/sockets.h>
 #include <lwip/netdb.h>
 
-#include "common.h" /* for prototypes and project-wide macros */
+#include "common.h" 
 
 #define TAG "wifi_manager"
 
@@ -56,15 +43,12 @@ static const int WIFI_CONNECTED_BIT = BIT0;
 static bool g_wifi_connected = false;
 static bool g_provisioning_mode = false;
 
-/* http + dns */
 static httpd_handle_t http_server = NULL;
 static TaskHandle_t dns_task_handle = NULL;
 static volatile bool dns_server_running = false;
 
-/* optional callback for backwards compatibility */
 static void (*g_on_creds_found)(const char *ssid, const char *pass) = NULL;
 
-/* forward declarations */
 static bool wifi_credentials_exist(void);
 static esp_err_t save_wifi_credentials(const char *ssid, const char *password);
 static esp_err_t load_wifi_credentials(char *ssid, size_t ssid_len, char *password, size_t pass_len);
@@ -94,7 +78,6 @@ const char *wifi_manager_get_auth_token(void)
     return g_auth_token_buf;
 }
 
-/* ---------- Auth helpers (minimal) ---------- */
 
 static esp_err_t auth_clear_token(void)
 {
@@ -119,8 +102,6 @@ static esp_err_t auth_clear_token(void)
 
     return err;
 }
-
-/* ---------- NVS-based WiFi credential helpers ---------- */
 
 static bool wifi_credentials_exist(void)
 {
@@ -176,8 +157,6 @@ esp_err_t wifi_manager_clear_credentials(void)
     ESP_LOGI(TAG, "Cleared WiFi credentials from NVS");
     return ESP_OK;
 }
-
-/* ---------- Event handler ---------- */
 
 static void event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)
@@ -239,30 +218,24 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         g_wifi_connected = true;
         g_provisioning_mode = false;
 
-        /* stop provisioning services if running */
         stop_dns_server();
         stop_http_server();
 
-        /* save the credentials currently configured on STA */
         wifi_config_t cfg;
         if (esp_wifi_get_config(WIFI_IF_STA, &cfg) == ESP_OK) {
             save_wifi_credentials((const char *)cfg.sta.ssid, (const char *)cfg.sta.password);
             if (g_on_creds_found) g_on_creds_found((const char *)cfg.sta.ssid, (const char *)cfg.sta.password);
         }
 
-        /* trigger post-wifi auth in background */
         auth_check_after_wifi();
     }
 }
-
-/* ---------- AP setup task ---------- */
 
 static void ap_mode_task(void *param)
 {
     vTaskDelay(pdMS_TO_TICKS(500)); /* small delay */
     ESP_LOGI(TAG, "AP mode task: stopping wifi and starting AP+STA");
 
-    /* Stop any running provisioning services cleanly */
     stop_dns_server();
     stop_http_server();
 
@@ -280,8 +253,6 @@ static void ap_mode_task(void *param)
     vTaskDelete(NULL);
 }
 
-/* ---------- DNS captive server ---------- */
-
 static void dns_server_task(void *pvParameters)
 {
     int sock = -1;
@@ -297,7 +268,6 @@ static void dns_server_task(void *pvParameters)
         return;
     }
 
-    /* optional reuse */
     int opt = 1;
     setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
@@ -323,31 +293,31 @@ static void dns_server_task(void *pvParameters)
         socklen_t ra_len = sizeof(ra);
         int len = recvfrom(sock, rx, sizeof(rx), 0, (struct sockaddr *)&ra, &ra_len);
         if (len > 0 && len >= 12) {
-            /* build response copying headers and name */
+            
             memcpy(tx, rx, len);
-            /* mark response + recursion available + no error */
+           
             tx[2] = 0x81;
             tx[3] = 0x80;
-            /* answer count = 1 */
+      
             tx[6] = 0x00;
             tx[7] = 0x01;
 
             int tx_len = len;
-            /* pointer to name */
+          
             tx[tx_len++] = 0xC0;
             tx[tx_len++] = 0x0C;
-            /* type A */
+
             tx[tx_len++] = 0x00;
             tx[tx_len++] = 0x01;
-            /* class IN */
+         
             tx[tx_len++] = 0x00;
             tx[tx_len++] = 0x01;
-            /* TTL 60s */
+    
             tx[tx_len++] = 0x00;
             tx[tx_len++] = 0x00;
             tx[tx_len++] = 0x00;
             tx[tx_len++] = 0x3C;
-            /* data length 4 */
+       
             tx[tx_len++] = 0x00;
             tx[tx_len++] = 0x04;
             /* 192.168.4.1 */
@@ -388,8 +358,6 @@ static void stop_dns_server(void)
     }
 }
 
-/* ---------- HTTP captive portal ---------- */
-
 static const char *wifi_config_html =
     "<!DOCTYPE html><html><head>"
     "<meta name='viewport' content='width=device-width,initial-scale=1'>"
@@ -404,7 +372,6 @@ static esp_err_t captive_portal_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "Captive portal request: %s", req->uri);
 
-    /* Common OS connectivity checks - redirect to root */
     if (strcmp(req->uri, "/generate_204") == 0 ||
         strcmp(req->uri, "/gen_204") == 0 ||
         strcmp(req->uri, "/ncsi.txt") == 0 ||
@@ -430,7 +397,6 @@ static esp_err_t http_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-/* Basic form parsing: expects application/x-www-form-urlencoded */
 static esp_err_t http_configure_handler(httpd_req_t *req)
 {
     int content_len = req->content_len;
@@ -458,7 +424,6 @@ static esp_err_t http_configure_handler(httpd_req_t *req)
     char ssid[33] = {0};
     char password[65] = {0};
 
-    /* crude parsing: find "ssid=" and "password=" */
     char *p = strstr(buf, "ssid=");
     if (p) {
         p += 5;
@@ -483,7 +448,6 @@ static esp_err_t http_configure_handler(httpd_req_t *req)
 
     free(buf);
 
-    /* URL decode safely into final buffers */
     {
         int j = 0;
         for (int i = 0; ssid_raw[i] != '\0' && j < (int)sizeof(ssid)-1; ++i) {
@@ -519,7 +483,6 @@ static esp_err_t http_configure_handler(httpd_req_t *req)
 
     ESP_LOGI(TAG, "Received SSID: %s", ssid);
 
-    /* configure STA with provided credentials */
     wifi_config_t wifi_cfg = { 0 };
     strncpy((char *)wifi_cfg.sta.ssid, ssid, sizeof(wifi_cfg.sta.ssid) - 1);
     strncpy((char *)wifi_cfg.sta.password, password, sizeof(wifi_cfg.sta.password) - 1);
@@ -578,7 +541,6 @@ static void start_http_server(void)
         };
         httpd_register_uri_handler(http_server, &uri_config);
 
-        /* captive portal detection endpoints + wildcard */
         const char *endpoints[] = {
             "/generate_204", "/gen_204", "/ncsi.txt", "/connecttest.txt",
             "/hotspot-detect.html", "/library/test/success.html", "/success.txt", "/*"
@@ -607,8 +569,6 @@ static void stop_http_server(void)
         http_server = NULL;
     }
 }
-
-/* ---------- SoftAP provisioning ---------- */
 
 static void get_device_service_name(char *service_name, size_t max)
 {
@@ -639,7 +599,6 @@ static esp_err_t start_softap_provisioning(void)
         return err;
     }
 
-    /* Ensure AP netif has expected IP (helps captive portal on some clients) */
     esp_netif_t *ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
     if (ap_netif) {
         esp_netif_ip_info_t ip_info;
@@ -662,7 +621,6 @@ void wifi_init(void)
         wifi_event_group = xEventGroupCreate();
     }
 
-    /* Register handlers - requires default event loop created by app_main */
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
 
@@ -691,7 +649,6 @@ void wifi_init(void)
         }
     }
 
-    /* no credentials or load failed -> start AP provisioning */
     ESP_LOGI(TAG, "No credentials or failed load - starting SoftAP provisioning");
     g_provisioning_mode = true;
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
@@ -699,7 +656,6 @@ void wifi_init(void)
     start_softap_provisioning();
 }
 
-/* ---------- Auth after WiFi ---------- */
 
 static void auth_after_wifi_task(void *param)
 {
@@ -719,7 +675,6 @@ static void auth_after_wifi_task(void *param)
         }
     }
 
-    /* Need new token */
     ESP_LOGI(TAG, "Auth: No token in NVS. Generating new one...");
 
     ESP_LOGW(TAG, "Auth: Token generation skipped (feature disabled).");
@@ -732,7 +687,6 @@ static void auth_after_wifi_task(void *param)
 
 void auth_check_after_wifi(void)
 {
-    /* Always async: never block inside IP_EVENT handler */
     if (xTaskCreate(auth_after_wifi_task, "auth_after_wifi",
                     8192, NULL, 5, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create auth_after_wifi_task");
