@@ -102,8 +102,8 @@ in_out: {codec: ES8311, pa: 46, pa_gain:6}
 
 Board: ESP32_S3_EchoEar
 i2c: {sda: 2, scl: 1}
-i2s: {bclk: 40, ws: 39, dout: 41, din: 15, mclk: 42}
-out: {codec: ES8311, pa: 4, use_mclk: 1, pa_gain:6}
+i2s: {bclk: 40, ws: 39, dout: 41, din: 3, mclk: 42}
+out: {codec: ES8311, pa: 15, use_mclk: 1, pa_gain:6}
 in: {codec: ES7210}
 sdcard: {clk: 16, cmd: 38, d0: 17}
 

@@ -1,13 +1,5 @@
 # Changelog
 
-## v1.0.2
-
-- Fixed pin parse error
-
-## v1.0.1
-
-- Upgrade dependency of `esp_codev_dev` to v1.5.x
-
 ## v1.0.0
 
 - Upgrade dependency of `esp_codev_dev` to v1.4.0

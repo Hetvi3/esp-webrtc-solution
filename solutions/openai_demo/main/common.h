@@ -24,6 +24,8 @@ extern "C" {
  */
 void init_board(void);
 
+void bsp_power_init(void);
+
 /**
  * @brief  OpenAI signaling configuration
  *
@@ -32,6 +34,7 @@ void init_board(void);
 typedef struct {
    char *token; /*!< OpenAI token */
    char *voice; /*!< Voice to select */
+    char *instructions; /*!< Optional session-level instructions / persona sent to the Realtime API */
 } openai_signaling_cfg_t;
 
 /**
@@ -42,6 +45,36 @@ typedef struct {
  *      - Others  OpenAI signaling implementation
  */
 const esp_peer_signaling_impl_t *esp_signaling_get_openai_signaling(void);
+
+/* ========== WiFi Manager (from wifi_manager.c) ========== */
+
+/**
+ * @brief Clear WiFi credentials + Auth token
+ */
+esp_err_t wifi_manager_clear_credentials(void);
+
+/**
+ * @brief Check if STA is connected
+ */
+bool wifi_manager_is_connected(void);
+
+/**
+ * @brief Trigger auth token check after WiFi connects
+ *
+ * Called automatically by IP_EVENT_STA_GOT_IP in wifi_manager.c,
+ * but available for manual invocation if needed.
+ */
+void auth_check_after_wifi(void);
+
+/**
+ * @brief Get loaded/generated auth token (optional but useful)
+ */
+const char *wifi_manager_get_auth_token(void);
+
+/**
+ * @brief Start WiFi Manager (connect or start SoftAP provisioning)
+ */
+void wifi_manager_start(void (*on_creds_found)(const char *ssid, const char *pass));
 
 /**
  * @brief  Start WebRTC

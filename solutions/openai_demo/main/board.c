@@ -5,8 +5,13 @@
 #include "esp_codec_dev.h"
 #include "sdkconfig.h"
 #include "settings.h"
+#include "driver/gpio.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static const char *TAG = "Board";
+
+#define BSP_POWER_CODEC_EN 48
 
 void init_board(void)
 {
@@ -21,4 +26,17 @@ void init_board(void)
         .reuse_dev = false
     };
     init_codec(&cfg);
+}
+
+void bsp_power_init(void)
+{
+    ESP_LOGI(TAG, "Codec Power Enabled");
+    gpio_config_t io_conf = {
+        .pin_bit_mask = 1ULL << BSP_POWER_CODEC_EN,
+        .mode = GPIO_MODE_OUTPUT,
+    };
+    gpio_config(&io_conf);
+
+    gpio_set_level(BSP_POWER_CODEC_EN, 1);  
+    vTaskDelay(pdMS_TO_TICKS(50));         
 }

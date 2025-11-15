@@ -23,12 +23,9 @@
 #include "common.h"
 #include "esp_capture.h"
 
-static int start_chat(int argc, char **argv)
-{
-    start_webrtc();
-    return 0;
-}
+static int network_event_handler(bool connected);
 
+#define TAG "MAIN"
 #define RUN_ASYNC(name, body)           \
     void run_async##name(void *arg)     \
     {                                   \
@@ -36,6 +33,22 @@ static int start_chat(int argc, char **argv)
         media_lib_thread_destroy(NULL); \
     }                                   \
     media_lib_thread_create_from_scheduler(NULL, #name, run_async##name, NULL);
+
+    static int network_event_handler(bool connected)
+{
+    if (connected) {
+        RUN_ASYNC(start, { start_webrtc(); });
+    } else {
+        RUN_ASYNC(stop, { stop_webrtc(); });
+    }
+    return 0;
+}
+
+static int start_chat(int argc, char **argv)
+{
+    start_webrtc();
+    return 0;
+}
 
 static int stop_chat(int argc, char **argv)
 {
@@ -87,6 +100,12 @@ static int text_cli(int argc, char **argv)
         openai_send_text(argv[1]);
     }
     return 0;
+}
+
+static void wifi_connected_cb(const char *ssid, const char *pass)
+{
+    ESP_LOGI(TAG, "Connecting with credentials SSID=%s", ssid);
+    network_init(ssid, pass, network_event_handler);
 }
 
 static int init_console()
@@ -217,27 +236,25 @@ static void capture_scheduler(const char *name, esp_capture_thread_schedule_cfg_
     schedule_cfg->core_id = cfg.core_id;
 }
 
-static int network_event_handler(bool connected)
-{
-    // Run async so that not block wifi event callback
-    if (connected) {
-        RUN_ASYNC(start, { start_webrtc(); });
-    } else {
-        RUN_ASYNC(stop, { stop_webrtc(); });
-    }
-    return 0;
-}
-
 void app_main(void)
 {
+    ESP_ERROR_CHECK(nvs_flash_init());                 // init NVS
+    ESP_ERROR_CHECK(esp_event_loop_create_default());  // create default event loop
+
+    bsp_power_init();     
+    vTaskDelay(pdMS_TO_TICKS(30));
+
+    init_board();     
+    
+    wifi_manager_start(wifi_connected_cb);
+
     esp_log_level_set("*", ESP_LOG_INFO);
     media_lib_add_default_adapter();
     esp_capture_set_thread_scheduler(capture_scheduler);
     media_lib_thread_set_schedule_cb(thread_scheduler);
-    init_board();
     media_sys_buildup();
     init_console();
-    network_init(WIFI_SSID, WIFI_PASSWORD, network_event_handler);
+
     while (1) {
         media_lib_thread_sleep(2000);
         query_webrtc();

@@ -7,6 +7,13 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 
+/*
+  NOTE: This file was extended to include session-level "instructions" (persona)
+  when creating an ephemeral realtime session with OpenAI. The property added to the
+  session creation JSON is "instructions", as described in the OpenAI Realtime API docs:
+  https://platform.openai.com/docs/api-reference/realtime/sessions/create
+*/
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -66,7 +73,16 @@ static void session_answer(http_resp_t *resp, void *ctx)
     *e = '"';
 }
 
-static void get_ephemeral_token(openai_signaling_t *sig, char *token, char *voice)
+/*
+ * Build and send a request to create an ephemeral realtime session, storing the returned ephemeral token.
+ *
+ * Parameters:
+ *  - sig: openai_signaling_t context to receive the ephemeral token
+ *  - token: long-lived API key (Authorization: Bearer <token>) used to call /v1/realtime/sessions
+ *  - voice: requested voice string (may be NULL)
+ *  - instructions: optional session-level instructions / persona to send to the model (may be NULL)
+ */
+static void get_ephemeral_token(openai_signaling_t *sig, char *token, char *voice, char *instructions)
 {
     char content_type[32] = "Content-Type: application/json";
     int len = strlen("Authorization: Bearer ") + strlen(token) + 1;
@@ -77,13 +93,25 @@ static void get_ephemeral_token(openai_signaling_t *sig, char *token, char *voic
         auth,
         NULL,
     };
+
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "model", OPENAI_REALTIME_MODEL);
+
     cJSON *modalities = cJSON_CreateArray();
     cJSON_AddItemToArray(modalities, cJSON_CreateString("text"));
     cJSON_AddItemToArray(modalities, cJSON_CreateString("audio"));
     cJSON_AddItemToObject(root, "modalities", modalities);
-    cJSON_AddStringToObject(root, "voice", voice);
+
+    if (voice) {
+        cJSON_AddStringToObject(root, "voice", voice);
+    }
+
+    // If instructions provided, include them in the session creation payload so the model uses the given persona
+    if (instructions && instructions[0] != '\0') {
+        cJSON_AddStringToObject(root, "instructions", instructions);
+        ESP_LOGI(TAG, "Adding session instructions for persona");
+    }
+
     char *json_string = cJSON_Print(root);
     if (json_string) {
         https_post("https://api.openai.com/v1/realtime/sessions", header, json_string, NULL, session_answer, sig);
@@ -100,8 +128,8 @@ static int openai_signaling_start(esp_peer_signaling_cfg_t *cfg, esp_peer_signal
     }
     openai_signaling_cfg_t *openai_cfg = (openai_signaling_cfg_t *)cfg->extra_cfg;
     sig->cfg = *cfg;
-    // alloy, ash, ballad, coral, echo sage, shimmer and verse
-    get_ephemeral_token(sig, openai_cfg->token, openai_cfg->voice ? openai_cfg->voice : "alloy");
+    // call get_ephemeral_token with optional instructions
+    get_ephemeral_token(sig, openai_cfg->token, openai_cfg->voice, openai_cfg->instructions);
     if (sig->ephemeral_token == NULL) {
         free(sig);
         return ESP_PEER_ERR_NOT_SUPPORT;

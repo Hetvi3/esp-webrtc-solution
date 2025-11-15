@@ -536,7 +536,7 @@ int init_codec(codec_init_cfg_t *cfg)
     }
     if (codec_res.record_dev) {
         codec_res.record_i2s_port = in_cfg.i2s_port;
-        esp_codec_dev_set_in_gain(codec_res.record_dev, 30.0);
+        esp_codec_dev_set_in_gain(codec_res.record_dev, 10.0);
     }
     if ((codec_res.play_dev != NULL) || (codec_res.record_dev != NULL)) {
         codec_res.inited = true;

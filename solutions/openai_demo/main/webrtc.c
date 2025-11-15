@@ -532,7 +532,10 @@ int start_webrtc(void)
     };
     openai_signaling_cfg_t openai_cfg = {
         .token = OPENAI_API_KEY,
+        .voice = OPENAI_VOICE,
+        .instructions = (char *)OPENAI_CHARACTER_INSTRUCTIONS,
     };
+    
     esp_webrtc_cfg_t cfg = {
         .peer_cfg = {
             .audio_info = {
