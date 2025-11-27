@@ -472,10 +472,16 @@ static int webrtc_event_handler(esp_webrtc_event_t *event, void *ctx)
         esp_peer_handle_t peer_handle = NULL;
         esp_webrtc_get_peer_connection(webrtc, &peer_handle);
         esp_peer_create_data_channel(peer_handle, &cfg);
+        
+        // Update LED to show connected state
+        led_controller_set_state(LED_STATE_CONNECTED);
     }
     if (event->type == ESP_WEBRTC_EVENT_DATA_CHANNEL_OPENED) {
         send_response("You are helpful and have some tools installed. In the tools you have the ability to control a light bulb and change speaker volume. Say 'How can I help?");
         send_function_desc();
+        
+        // Update LED to show listening state when ready for interaction
+        led_controller_set_state(LED_STATE_LISTENING);
     }
     return 0;
 }
@@ -593,6 +599,9 @@ int stop_webrtc(void)
         esp_webrtc_handle_t handle = webrtc;
         webrtc = NULL;
         esp_webrtc_close(handle);
+        
+        // Update LED to idle state when WebRTC stops
+        led_controller_set_state(LED_STATE_IDLE);
     }
     return 0;
 }

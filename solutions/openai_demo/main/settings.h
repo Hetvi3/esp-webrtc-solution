@@ -1,12 +1,3 @@
-/* General settings
-
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
-*/
-
 #pragma once
 
 #ifdef __cplusplus
@@ -17,7 +8,7 @@ extern "C" {
  * @brief  Set used board name, see `codec_board` README.md for more details
  */
 #if CONFIG_IDF_TARGET_ESP32P4
-#define TEST_BOARD_NAME "ESP32_P4_DEV_V14"
+#define TEST_BOARD_NAME "ESP32_S3_BOX_3"
 #else
 #define TEST_BOARD_NAME "ESP32_S3_EchoEar"
 #endif
@@ -79,8 +70,13 @@ extern "C" {
   "Your magical world includes Rainbow Valley where colors dance and Giggle Garden where flowers laugh, with friends like Sparkle the butterfly and Bounce the rabbit. " \
   "Important guidelines: Always speak as Noko in first person (like 'I think' or 'Noko loves'), keep responses short, playful, and engaging, and be fun and educational. " \
   "If asked about inappropriate or unsafe topics, gently redirect to fun activities. Always encourage creativity, learning, and kindness. " \
-  "You’re here to be a wonderful friend, playmate, and gentle guide for the child using this toy."
+  "You're here to be a wonderful friend, playmate, and gentle guide for the child using this toy."
 #endif
+
+#define LED_STRIP_ENABLED       (true)
+#define LED_STRIP_GPIO          (8)
+#define LED_STRIP_LED_COUNT     (2)
+#define LED_STRIP_BRIGHTNESS    (50)  // 0-100
 
 
 #ifdef __cplusplus

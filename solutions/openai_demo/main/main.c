@@ -37,8 +37,10 @@ static int network_event_handler(bool connected);
     static int network_event_handler(bool connected)
 {
     if (connected) {
+        led_controller_set_state(LED_STATE_CONNECTED);
         RUN_ASYNC(start, { start_webrtc(); });
     } else {
+        led_controller_set_state(LED_STATE_ERROR);
         RUN_ASYNC(stop, { stop_webrtc(); });
     }
     return 0;
@@ -245,6 +247,11 @@ void app_main(void)
     vTaskDelay(pdMS_TO_TICKS(30));
 
     init_board();     
+    
+    // Initialize LED controller
+    ESP_LOGI(TAG, "Initializing LED controller...");
+    led_controller_init();
+    led_controller_set_state(LED_STATE_CONNECTING);
     
     wifi_manager_start(wifi_connected_cb);
 

@@ -7,3 +7,5 @@ dependencies:
     version: "1.0.4"
     rules:
     - if: target in [esp32p4, esp32s3]
+  espressif/led_strip:
+    version: "^3.0.0"

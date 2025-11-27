@@ -37,79 +37,44 @@ typedef struct {
     char *instructions; /*!< Optional session-level instructions / persona sent to the Realtime API */
 } openai_signaling_cfg_t;
 
-/**
- * @brief  Get OpenAI signaling implementation
- *
- * @return
- *      - NULL    Not enough memory
- *      - Others  OpenAI signaling implementation
- */
 const esp_peer_signaling_impl_t *esp_signaling_get_openai_signaling(void);
 
-/* ========== WiFi Manager (from wifi_manager.c) ========== */
-
-/**
- * @brief Clear WiFi credentials + Auth token
- */
 esp_err_t wifi_manager_clear_credentials(void);
 
-/**
- * @brief Check if STA is connected
- */
 bool wifi_manager_is_connected(void);
 
-/**
- * @brief Trigger auth token check after WiFi connects
- *
- * Called automatically by IP_EVENT_STA_GOT_IP in wifi_manager.c,
- * but available for manual invocation if needed.
- */
 void auth_check_after_wifi(void);
 
-/**
- * @brief Get loaded/generated auth token (optional but useful)
- */
 const char *wifi_manager_get_auth_token(void);
 
-/**
- * @brief Start WiFi Manager (connect or start SoftAP provisioning)
- */
 void wifi_manager_start(void (*on_creds_found)(const char *ssid, const char *pass));
 
-/**
- * @brief  Start WebRTC
- *
- * @return
- *      - 0       On success
- *      - Others  Fail to start
- */
 int start_webrtc(void);
 
-/**
- * @brief  Send text to OpenAI server
- *
- * @param[in]  text  Text to be sent
- *
- * @return
- *      - 0       On success
- *      - Others  Fail to start
- */
 int openai_send_text(char *text);
 
-/**
- * @brief  Query WebRTC status
- */
 void query_webrtc(void);
 
-/**
- * @brief  Start WebRTC
- *
- * @param[in]  url  Signaling URL
- *
- * @return
- *      - 0       On success
- *      - Others  Fail to start
- */
+
+typedef enum {
+    LED_STATE_IDLE,        /* Idle state - soft breathing blue */
+    LED_STATE_CONNECTING,  /* Connecting to WiFi/WebRTC - yellow pulsing */
+    LED_STATE_CONNECTED,   /* Connected - solid green */
+    LED_STATE_SPEAKING,    /* Speaking/transmitting audio - red wave */
+    LED_STATE_LISTENING,   /* Listening/receiving audio - green wave */
+    LED_STATE_ERROR,       /* Error state - red blinking */
+    LED_STATE_OFF,         /* LEDs turned off */
+} led_state_t;
+
+
+esp_err_t led_controller_init(void);
+
+esp_err_t led_controller_set_state(led_state_t state);
+
+led_state_t led_controller_get_state(void);
+
+esp_err_t led_controller_deinit(void);
+
 int stop_webrtc(void);
 
 #ifdef __cplusplus
