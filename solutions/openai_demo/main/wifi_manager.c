@@ -5,11 +5,9 @@
 #include <sys/param.h>
 #include <stdlib.h>
 #include <ctype.h>
-
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/event_groups.h>
-
 #include <esp_log.h>
 #include <esp_system.h>
 #include <esp_wifi.h>
@@ -17,7 +15,6 @@
 #include <esp_netif.h>
 #include <nvs.h>
 #include <nvs_flash.h>
-
 #include <esp_http_server.h>
 #include <esp_http_client.h>
 #include <lwip/sockets.h>
@@ -37,7 +34,6 @@
 #define DNS_PORT              53
 #define DNS_MAX_LEN           256
 
-/* public state */
 static EventGroupHandle_t wifi_event_group = NULL;
 static const int WIFI_CONNECTED_BIT = BIT0;
 static bool g_wifi_connected = false;
@@ -70,14 +66,12 @@ static void get_device_service_name(char *service_name, size_t max);
 static void event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data);
 
-/* auth token buffer */
 static char g_auth_token_buf[MAX_AUTH_TOKEN_SIZE] = {0};
 
 const char *wifi_manager_get_auth_token(void)
 {
     return g_auth_token_buf;
 }
-
 
 static esp_err_t auth_clear_token(void)
 {
@@ -98,7 +92,7 @@ static esp_err_t auth_clear_token(void)
     nvs_commit(nvs_handle);
     nvs_close(nvs_handle);
 
-    memset(g_auth_token_buf, 0, sizeof(g_auth_token_buf));  // clear RAM copy
+    memset(g_auth_token_buf, 0, sizeof(g_auth_token_buf));  
 
     return err;
 }
@@ -170,6 +164,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         switch (event_id) {
         case WIFI_EVENT_STA_START:
             ESP_LOGI(TAG, "STA started");
+            led_controller_set_state(LED_STATE_CONNECTING);
             if (!g_provisioning_mode) {
                 esp_wifi_connect();
             } else {
@@ -182,6 +177,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 ESP_LOGI(TAG, "Ignoring STA disconnect due to provisioning mode");
                 break;
             }
+            led_controller_set_state(LED_STATE_CONNECTING);
             if (s_retry_num < 10) {
                 s_retry_num++;
                 ESP_LOGI(TAG, "Retrying connect (%d/10)...", s_retry_num);
@@ -192,7 +188,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 g_provisioning_mode = true;
                 xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
                 g_wifi_connected = false;
-                /* create task to configure AP mode to avoid doing too much in event context */
+                led_controller_set_state(LED_STATE_ERROR);
                 if (xTaskCreate(ap_mode_task, "ap_mode_task", 4096, NULL, 5, NULL) != pdPASS) {
                     ESP_LOGE(TAG, "Failed to create ap_mode_task");
                 }
@@ -218,6 +214,8 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         g_wifi_connected = true;
         g_provisioning_mode = false;
 
+        led_controller_set_state(LED_STATE_CONNECTED);
+
         stop_dns_server();
         stop_http_server();
 
@@ -233,7 +231,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
 
 static void ap_mode_task(void *param)
 {
-    vTaskDelay(pdMS_TO_TICKS(500)); /* small delay */
+    vTaskDelay(pdMS_TO_TICKS(500));
     ESP_LOGI(TAG, "AP mode task: stopping wifi and starting AP+STA");
 
     stop_dns_server();
@@ -293,31 +291,29 @@ static void dns_server_task(void *pvParameters)
         socklen_t ra_len = sizeof(ra);
         int len = recvfrom(sock, rx, sizeof(rx), 0, (struct sockaddr *)&ra, &ra_len);
         if (len > 0 && len >= 12) {
-            
             memcpy(tx, rx, len);
-           
+
             tx[2] = 0x81;
             tx[3] = 0x80;
-      
+
             tx[6] = 0x00;
             tx[7] = 0x01;
 
             int tx_len = len;
-          
+
             tx[tx_len++] = 0xC0;
             tx[tx_len++] = 0x0C;
 
             tx[tx_len++] = 0x00;
             tx[tx_len++] = 0x01;
-         
+
             tx[tx_len++] = 0x00;
             tx[tx_len++] = 0x01;
-    
             tx[tx_len++] = 0x00;
             tx[tx_len++] = 0x00;
             tx[tx_len++] = 0x00;
             tx[tx_len++] = 0x3C;
-       
+
             tx[tx_len++] = 0x00;
             tx[tx_len++] = 0x04;
             /* 192.168.4.1 */
@@ -491,7 +487,6 @@ static esp_err_t http_configure_handler(httpd_req_t *req)
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "esp_wifi_set_config failed: %s", esp_err_to_name(err));
     } else {
-        /* explicitly connect so driver attempts to join before restart */
         esp_err_t cerr = esp_wifi_connect();
         if (cerr != ESP_OK) {
             ESP_LOGW(TAG, "esp_wifi_connect returned %s", esp_err_to_name(cerr));
@@ -518,7 +513,7 @@ static void start_http_server(void)
     if (http_server != NULL) return;
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 16;   // <-- ADD THIS
+    config.max_uri_handlers = 16;  
     config.lru_purge_enable = true;
     config.server_port = 80;
 
@@ -591,7 +586,7 @@ static esp_err_t start_softap_provisioning(void)
     ap_config.ap.ssid_len = strlen(service_name);
     ap_config.ap.channel = 1;
     ap_config.ap.authmode = WIFI_AUTH_OPEN;
-    ap_config.ap.max_connection = 8; /* bumped to 8 */
+    ap_config.ap.max_connection = 8; 
 
     esp_err_t err = esp_wifi_set_config(WIFI_IF_AP, &ap_config);
     if (err != ESP_OK) {
@@ -655,7 +650,6 @@ void wifi_init(void)
     ESP_ERROR_CHECK(esp_wifi_start());
     start_softap_provisioning();
 }
-
 
 static void auth_after_wifi_task(void *param)
 {
