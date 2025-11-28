@@ -106,8 +106,9 @@ static int text_cli(int argc, char **argv)
 
 static void wifi_connected_cb(const char *ssid, const char *pass)
 {
-    ESP_LOGI(TAG, "Connecting with credentials SSID=%s", ssid);
-    network_init(ssid, pass, network_event_handler);
+    ESP_LOGI(TAG, "Connected with credentials SSID=%s", ssid);
+    network_set_connection_state(true);
+    network_event_handler(true);
 }
 
 static int init_console()

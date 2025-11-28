@@ -54,6 +54,13 @@ int network_get_mac(uint8_t mac[6]);
 bool network_is_connected(void);
 
 /**
+ * @brief  Set network connection state manually
+ *
+ * @param[in]  connected  Connection state
+ */
+void network_set_connection_state(bool connected);
+
+/**
  * @brief  Connect wifi manually
  *
  * @param[in]  ssid      Wifi ssid
